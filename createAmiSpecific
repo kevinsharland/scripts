@@ -1,0 +1,58 @@
+#!/bin/bash
+
+if [ $# -lt 3 ]
+then
+echo "Provide a valid source region and destination region along with an instance-id
+example:
+ap-south-1 sa-east-1 i-0c970e95d66f93db7 i-062dfc958ba24a80e
+you can have as many instance id's as you want."
+exit 1
+fi
+
+
+#sourceregion="ap-south-1"
+#destinationregion="sa-east-1"
+date=$(date "+%m/%d/%Y/%H/%M")
+sourceregion=$1
+destinationregion=$2
+
+echo "--------------------------------------------------------------------------------------------------------"
+echo $date
+
+#creates the ami
+for imageid in "$@"
+	do
+	echo $imageid
+	instancename=$(aws ec2 describe-instances --region $sourceregion --query "Reservations[?Instances[?InstanceId=='$imageid']].Instances[].Tags[].Value | [0]" | sed 's/[],"[]//g')
+	createdamiid=$(aws ec2 create-image --region $sourceregion --instance-id $imageid --name $instancename$date --no-reboot | grep "ImageId" | awk '{print $2}'| sed 's/[]",}[{[]//g' >> /tmp/$sourceregion\image.txt)
+done
+
+#checks to see if the ami has been created
+echo "checking ami status"
+sleep 10
+
+state=1
+while [ "$state" -gt 0 ]
+	do
+		echo $state pending 
+		state=$(aws ec2 describe-images --region $sourceregion --owner 376797288585 --query "Images[].State" | grep -e "pending" | wc -l)
+		sleep 8
+done
+
+sleep 10
+echo "done"
+
+#copies the ami to another region
+for amiid in $(cat /tmp/$sourceregion\image.txt)
+	do
+		aminame=$(aws ec2 describe-images --region $sourceregion --owner 376797288585 --query "Images[?ImageId=='$amiid'].Name" | sed 's/[]",}[{[]//g' | sed '/^\s*$/d')
+		for name in "$amiid"
+			do
+			aws ec2 copy-image --source-image-id $name --source-region $sourceregion --region $destinationregion --name "$aminame"
+			echo $name $aminame
+		done
+done
+
+echo "--------------------------------------------------------------------------------------------------------"
+
+rm /tmp/$sourceregion\image.txt

@@ -1,0 +1,133 @@
+#!/bin/bash
+
+#checks to see if the enteredthe correct information
+if [ $# -lt 4 ]
+then
+echo "Specify \"Source region\", \"Destination region\", \"Source vpc ID\", \"Destination vpc ID\":
+--------
+Options for our current infrastructure:
+--------
+Ireland to London
+eu-west-1 eu-west-2 vpc-fa04ac9c vpc-08561557b8a0ee5f5
+Virginia to Ohio
+us-east-1 us-east-2 vpc-7c239f07 vpc-0b06fc8f66e252117
+Tokyo to Seoul
+ap-northeast-1 ap-northeast-2 vpc-af9e1ac8 vpc-0a77267d8b1de0154
+Singapore to Sydney
+ap-southeast-1 ap-southeast-2 vpc-d29011b5 vpc-0337fdd38acee1919
+-----------
+Additional:
+-----------
+Can copy different security groups from different VPC's, add the word skip.
+example:
+eu-west-1 eu-west-2 vpc-fa04ac9c vpc-08561557b8a0ee5f5 skip
+Can also copy accross individual security groups, add the word skip along with the security groups name.
+example:
+eu-west-1 eu-west-2 vpc-fa04ac9c vpc-08561557b8a0ee5f5 skip launch-wizard-2
+"
+exit 1
+fi
+
+#can add the word "skip" to use a different VPC and security group
+if [ "$5" = "skip" ]
+	then
+		echo "skipping"
+	else
+		if [[ "$1" = "eu-west-1" && "$2" = "eu-west-2" && "$3" = "vpc-fa04ac9c" && "$4" = "vpc-08561557b8a0ee5f5" ]]
+			then
+				echo "Ireland to London"
+		elif [[ "$1" = "us-east-1" && "$2" = "us-east-2" && "$3" = "vpc-7c239f07" && "$4" = "vpc-0b06fc8f66e252117" ]]
+			then
+				echo "Virginia to Ohio"
+		elif [[ "$1" = "ap-northeast-1" && "$2" = "ap-northeast-2" && "$3" = "vpc-af9e1ac8" && "$4" = "vpc-0a77267d8b1de0154" ]]
+			then
+				echo "Tokyo to Seoul"
+		elif [[ "$1" = "ap-southeast-1" && "$2" = "ap-southeast-2" && "$3" = "vpc-d29011b5" && "$4" = "vpc-0337fdd38acee1919" ]]
+			then
+				echo "Singapore to Sydney"
+		else
+			echo "not a valid option"
+			echo "Options:
+			--------
+			Ireland to London
+			eu-west-1 eu-west-2 vpc-fa04ac9c vpc-08561557b8a0ee5f5
+			Virginia to Ohio
+			us-east-1 us-east-2 vpc-7c239f07 vpc-0b06fc8f66e252117
+			Tokyo to Seoul
+			ap-northeast-1 ap-northeast-2 vpc-af9e1ac8 vpc-0a77267d8b1de0154
+			Singapore to Sydney
+			ap-southeast-1 ap-southeast-2 vpc-d29011b5 vpc-0337fdd38acee1919"
+			exit 1
+		fi
+fi
+
+sourcesg=$1
+destinationsg=$2
+sourcevpcid=$3
+destinationvpcid=$4
+
+#get the security group names from the source region
+
+groupname=$(aws ec2 describe-security-groups --region $sourcesg --output text --filters Name=vpc-id,Values=$sourcevpcid --query 'SecurityGroups[].GroupName' | sed 's/[]",}[{[]//g')
+echo $groupname
+
+#creates the security groups in the destination region based on the names from the source region
+#$6 is for single security groups
+if [ -z "$6" ]
+        then
+                echo " "
+        else
+                groupname=$6
+fi
+
+for b in $groupname
+	do
+		echo $b
+		sg=$(aws ec2 create-security-group --region $destinationsg --group-name $b --vpc-id $destinationvpcid --description "None default VPC security group" >> /tmp/sg.txt)
+done
+
+echo "------------------------------------------------"
+
+#copying the content of the security groups from the source region to the destination region
+#can specify which security group to copy across, must have the word skip as $5 and the security groups name as $6
+if [ -z "$6" ]
+	then
+		echo " "
+	else 
+		groupname=$6
+fi 
+begin=0
+for ab in $groupname
+	do
+		echo "--"
+		echo $ab
+		echo "--"
+		numberofports=$(aws ec2 describe-security-groups --region $sourcesg --filters Name=vpc-id,Values=$sourcevpcid --query "SecurityGroups[?GroupName=='$ab'].IpPermissions[]" | grep FromPort | wc -l)
+		end=$numberofports
+
+		while [ $begin -lt $end ]
+			do
+				ipaddresses=$(aws ec2 describe-security-groups --region $sourcesg --filters Name=vpc-id,Values=$sourcevpcid --query "SecurityGroups[?GroupName=='$ab'].IpPermissions[$begin]" \
+					| grep CidrIp | awk '{print $2}' | sed 's/"//g')
+				fromport=$(aws ec2 describe-security-groups --region $sourcesg --filters Name=vpc-id,Values=$sourcevpcid --query "SecurityGroups[?GroupName=='$ab'].IpPermissions[$begin]" \
+					| grep FromPort | awk '{print $2}'| sed 's/,//g')
+				toport=$(aws ec2 describe-security-groups --region $sourcesg --filters Name=vpc-id,Values=$sourcevpcid --query "SecurityGroups[?GroupName=='$ab'].IpPermissions[$begin]" \
+					| grep ToPort | awk '{print $2}'| sed 's/,//g')
+				sgid=$(aws ec2 describe-security-groups --region $destinationsg --query "SecurityGroups[?GroupName=='$ab'].GroupId" | sed 's/[]",}[{[]//g' | sed '/^\s*$/d')
+				portname=$(aws ec2 describe-security-groups --region $sourcesg --filters Name=vpc-id,Values=$sourcevpcid --query "SecurityGroups[?GroupName=='$ab'].IpPermissions[$begin]" \
+					| grep IpProtocol | awk '{print $2}' |  sed 's/[]",}[{[]//g' | sed 's/"//g')
+			
+				echo Name:$ab Ip:$ipaddresses FromPort:$fromport ToPort:$toport Id:$sgid $portname
+			
+					for c in $ipaddresses
+						do
+							aws ec2 authorize-security-group-ingress --region $destinationsg --group-id $sgid --ip-permissions IpProtocol=$portname,FromPort=$fromport,ToPort=$toport,IpRanges=[{CidrIp=$c}]
+					done
+			
+			begin=`expr $begin + 1`
+		done
+	begin=0
+done
+echo "------------------------------------------------"
+
+rm /tmp/sg.txt

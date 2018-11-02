@@ -1,0 +1,94 @@
+#!/bin/bash
+
+instanceid="i-03a1058946fd1aef6"
+securitygroup1="sg-8d90f6f7"
+securitygroup2="sg-b75b04cd"
+securitygroup3="sg-ca59bab7"
+
+oldip=$(aws ec2 describe-instances --region eu-west-1 --instance-ids $instanceid --query 'Reservations[*].Instances[*].PublicIpAddress' | sed 's/[]"[]//g' | sed '/^\s*$/d')
+state=$(aws ec2 describe-instances --region eu-west-1 --instance-ids $instanceid --query 'Reservations[*].Instances[*].State.Name' | grep -e "running" -o -e "stopping" -o -e "pending" -o -e "stopped")
+
+echo "The old ipaddess: $oldip"
+echo " "
+aws ec2 revoke-security-group-ingress --dry-run --region eu-west-1 --group-id $securitygroup1 --protocol tcp --port 0-65535 --cidr $oldip/32
+aws ec2 revoke-security-group-ingress --dry-run --region eu-west-1 --group-id $securitygroup2 --protocol tcp --port 5432 --cidr $oldip/32
+aws ec2 revoke-security-group-ingress --dry-run --region eu-west-1 --group-id $securitygroup3 --protocol tcp --port 3389 --cidr $oldip/32
+echo "Removed IP from security groups: $securitygroup1, $securitygroup2, $securitygroup3"
+echo " "
+echo "Instance: $instanceid is stopping"
+echo " "
+stopped=$(aws ec2 stop-instances --dry-run --region eu-west-1 --instance-ids $instanceid --query 'StoppingInstances[*].[InstanceId]' | sed 's/[][]//g' | sed '/^\s*$/d')
+
+#while [ $state != "stopped" ]
+#do 
+#state=$(aws ec2 describe-instances --region eu-west-1 --instance-ids $instanceid --query 'Reservations[*].Instances[*].State.Name' | grep -e "running" -o -e "stopping" -o -e "pending" -o -e "stopped")
+#echo $state
+#done
+
+echo "Instance: $instanceid has $state"
+echo " "
+sleep 5
+
+starting=$(aws ec2 start-instances --dry-run --region eu-west-1 --instance-ids $instanceid --query 'StartingInstances[*].[InstanceId]' | sed 's/[][]//g' | sed '/^\s*$/d')
+echo "Instance: $instanceid is starting up, and performing system checks"
+echo " "
+
+instancestate=$(aws ec2 describe-instance-status --region eu-west-1 --instance-ids $instanceid --query 'InstanceStatuses[*].InstanceState.Name' | grep -e "running" -o -e "pending" -o -e "shutting-down" -o -e "terminated" -o -e "stopping" -o -e "stopped")
+systemstatus=$(aws ec2 describe-instance-status --region eu-west-1 --instance-ids $instanceid --query 'InstanceStatuses[*].SystemStatus.Details[*].Status' | grep -e "passed" -o -e "initializing")
+instancestatus=$(aws ec2 describe-instance-status --region eu-west-1 --instance-ids $instanceid --query 'InstanceStatuses[*].InstanceStatus.Status'| grep -e "ok" -o -e "initializing")
+
+
+while [ "$state" != "running" ]
+do
+state=$(aws ec2 describe-instances --region eu-west-1 --instance-ids $instanceid --query 'Reservations[*].Instances[*].State.Name' | grep -e "running" -o -e "stopping" -o -e "pending" -o -e "stopped")
+#echo $state
+done
+#aws ec2 describe-instances --instance-ids $instanceid --query 'Reservations[*].Instances[*].State.Name' | grep -e "running" -o -e "stopping" -o -e "pending" -o -e "stopped"
+echo "Instance is $state..."
+echo " "
+
+#sleep 10
+
+while [ "$instancestatus" != "ok" ]
+do
+instancestatus=$(aws ec2 describe-instance-status --region eu-west-1 --instance-ids $instanceid --query 'InstanceStatuses[*].InstanceStatus.Status'| grep -e "ok" -o -e "initializing")
+#echo $instancestatus
+done
+#aws ec2 describe-instance-status --instance-ids $instanceid --query 'InstanceStatuses[*].InstanceStatus.Status'| grep -e "ok" -o -e "initializing"
+echo "Instance check is $instancestatus..."
+echo " "
+
+while [ "$systemstatus" != "passed" ]
+do
+systemstatus=$(aws ec2 describe-instance-status --region eu-west-1 --instance-ids $instanceid --query 'InstanceStatuses[*].SystemStatus.Details[*].Status' | grep -e "passed" -o -e "initializing")
+#echo $systemstatus
+done
+#aws ec2 describe-instance-status --instance-ids $instanceid --query 'InstanceStatuses[*].SystemStatus.Details[*].Status' | grep -e "passed" -o -e "initializing"
+echo "System check has $systemstatus..."
+echo " "
+
+while [ "$instancestate" != "running" ]
+do
+instancestate=$(aws ec2 describe-instance-status --region eu-west-1 --instance-ids $instanceid --query 'InstanceStatuses[*].InstanceState.Name' | grep -e "running" -o -e "pending" -o -e "shutting-down" -o -e "terminated" -o -e "stopping" -o -e "stopped")
+#echo $instancestate
+done
+#aws ec2 describe-instance-status --instance-ids $instanceid --query 'InstanceStatuses[*].InstanceState.Name' | grep -e "running" -o -e "pending" -o -e "shutting-down" -o -e "terminated" -o -e "stopping" -o -e "stopped"
+echo "Instance is $instancestate..."
+echo " "
+
+if [ "$state" = "running" ] && [ "$instancestate" = "running" ] && [ "$systemstatus" = "passed" ] && [ "$instancestatus" = "ok" ]
+then
+echo "Instance is up and running"
+else
+echo "Instance is not starting up"
+fi
+
+newip=$(aws ec2 describe-instances --region eu-west-1 --instance-ids $instanceid --query 'Reservations[*].Instances[*].PublicIpAddress' | sed 's/[]"[]//g' | sed '/^\s*$/d')
+echo " "
+echo "The new ipaddress: $newip"
+echo " "
+aws ec2 authorize-security-group-ingress --dry-run --region eu-west-1 --group-id $securitygroup1 --protocol tcp --port 0-65535 --cidr $newip/32
+aws ec2 authorize-security-group-ingress --dry-run --region eu-west-1 --group-id $securitygroup2 --protocol tcp --port 5432 --cidr $newip/32
+aws ec2 authorize-security-group-ingress --dry-run --region eu-west-1 --group-id $securitygroup3 --protocol tcp --port 3389 --cidr $newip/32
+echo "Added new ipaddress to security groups $securitygroup1, $securitygroup2, $securitygroup3"
+

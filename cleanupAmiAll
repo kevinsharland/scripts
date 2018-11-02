@@ -1,0 +1,66 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]
+then
+echo "Options: Ireland = eu-west-1, Virginia = us-east-1, Tokyo = ap-northeast-1, Singapore = ap-southeast-1"
+echo "example: ./ami eu-west-1"
+exit 1
+fi
+
+if [ "$1" = "eu-west-1" ]
+then
+echo "Ireland"
+elif [ "$1" = "us-east-1" ]
+then
+echo "Virginia"
+elif [ "$1" = "ap-northeast-1" ]
+then
+echo "Tokyo"
+elif [ "$1" = "ap-southeast-1" ]
+then
+echo "Singapore"
+else
+echo "not a valid region"
+echo "Options: Ireland = eu-west-1, Virginia = us-east-1, Tokyo = ap-northeast-1, Singapore = ap-southeast-1"
+exit 1
+fi
+
+region=$1
+current=$(date "+%a %d %b %Y %r")
+startdate=$(date +%Y-%m-%d --date '7 days ago')
+enddate=$(date +%Y-%m-%d --date '6 days ago')
+aminame=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].{Name:Name,ID:ImageId}" | grep -e "Name" -e "ID" | awk '{print $2}' | sed 's/[",]//g')
+echo "-----------------------------------------------------------------------------------------------------------------------" >>/home/ec2-user/amiDelete.log
+echo $current >>/home/ec2-user/amiDelete.log
+echo "For $region" >>/home/ec2-user/amiDelete.log
+echo "Ireland = eu-west-1, Virginia = us-east-1, Tokyo = ap-northeast-1, Singapore = ap-southeast-1" >>/home/ec2-user/amiDelete.log
+echo " " >>/home/ec2-user/amiDelete.log
+echo "AMIs been removed for $startdate region $1" >>/home/ec2-user/amiDelete.log
+echo " " >>/home/ec2-user/amiDelete.log
+
+#Find the snapshot id from the AMI ID, and deregisters the AMI
+for output in $aminame
+do
+aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?ImageId=='$output'].[BlockDeviceMappings[*].Ebs.SnapshotId]" | grep snap | awk '{print $1}' | sed 's/[",]//g' >> /tmp/tmp.txt \
+&& echo "Deregistering: $output" \
+&& echo "Deregistering: $output" >> /home/ec2-user/amiDelete.log \
+&& aws ec2 deregister-image --region $region --image-id $output
+done
+
+echo " " >>/home/ec2-user/amiDelete.log
+
+#Finds the Snapshot from the previous loop, and deletes the Snapshot
+for input in $(cat /tmp/tmp.txt)
+do
+aws ec2 describe-snapshots --region $region --owner 376797288585 --query "Snapshots[?SnapshotId=='$input'].{VolumeId:VolumeId,SnapshotId:SnapshotId,Description:Description}" | sed 's/[]",}[{[]//g' >>/home/ec2-user/amiDelete.log \
+&& sleep 1 \
+&& echo "Deleting: $input" \
+&& echo "Deleting: $input" >> /home/ec2-user/amiDelete.log \
+&& aws ec2 delete-snapshot --region $region --snapshot-id $input
+done
+
+echo " " >>/home/ec2-user/amiDelete.log
+echo "Removed all the above AMIs and Snapshots" >>/home/ec2-user/amiDelete.log
+echo "-----------------------------------------------------------------------------------------------------------------------" >>/home/ec2-user/amiDelete.log
+
+rm /tmp/tmp.txt

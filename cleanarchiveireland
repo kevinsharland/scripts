@@ -1,0 +1,39 @@
+#!/bin/bash
+current=$(date "+%a %b %Y %r")
+startdate=$(date +%Y-%m-%d --date '7 days ago')
+enddate=$(date +%Y-%m-%d --date '6 days ago')
+ami=$(aws ec2 describe-images --region eu-west-1 --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].{Name:Name,ID:ImageId}" | grep ID | awk '{print $2}' | sed 's/[",]//g')
+aminame=$(aws ec2 describe-images --region eu-west-1 --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].{Name:Name,ID:ImageId}" | grep -e "Name" -e "ID" | awk '{print $2}' | sed 's/[",]//g')
+
+echo "-----------------------------------------------------------------------------------------------------------------------" >>/home/ec2-user/ami.log
+echo $current >>/home/ec2-user/ami.log
+echo " " >>/home/ec2-user/ami.log
+echo "AMIs been removed for $startdate" >>/home/ec2-user/ami.log
+echo " " >>/home/ec2-user/ami.log
+
+#Find the snapshot id from the AMI ID, and deregisters the AMI
+for output in $aminame
+do
+aws ec2 describe-images --region eu-west-1 --owner 376797288585 --query "Images[?ImageId=='$output'].[BlockDeviceMappings[*].Ebs.SnapshotId]" | grep snap | awk '{print $1}' | sed 's/[",]//g' >> /tmp/tmp.txt \
+&& echo "Deregistering: $output" \
+&& echo "Deregistering: $output" >> /home/ec2-user/ami.log \
+&& aws ec2 deregister-image --region eu-west-1 --image-id $output
+done
+
+echo " " >>/home/ec2-user/ami.log
+
+#Finds the Snapshot from the previous loop, and deletes the Snapshot
+for input in $(cat /tmp/tmp.txt)
+do
+aws ec2 describe-snapshots --region eu-west-1 --owner 376797288585 --query "Snapshots[?SnapshotId=='$input'].{VolumeId:VolumeId,SnapshotId:SnapshotId,Description:Description}" | sed 's/[]",}[{[]//g' >>/home/ec2-user/ami.log \
+&& sleep 1 \
+&& echo "Deleting: $input" \
+&& echo "Deleting: $input" >> /home/ec2-user/ami.log \
+&& aws ec2 delete-snapshot --region eu-west-1 --snapshot-id $input
+done
+
+echo " " >>/home/ec2-user/ami.log
+echo "Removed all the above AMIs and Snapshots" >>/home/ec2-user/ami.log
+echo "-----------------------------------------------------------------------------------------------------------------------" >>/home/ec2-user/ami.log
+
+rm /tmp/tmp.txt

@@ -1,0 +1,56 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]
+then
+echo "Options: Ireland = eu-west-1, Virginia = us-east-1, Tokyo = ap-northeast-1, Singapore = ap-southeast-1"
+echo "example: ./ami eu-west-1"
+exit 1
+fi
+
+if [ "$1" = "eu-west-1" ]
+then
+echo "Ireland"
+elif [ "$1" = "us-east-1" ]
+then
+echo "Virginia"
+elif [ "$1" = "ap-northeast-1" ]
+then
+echo "Tokyo"
+elif [ "$1" = "ap-southeast-1" ]
+then
+echo "Singapore"
+else
+echo "not a valid region"
+echo "Options: Ireland = eu-west-1, Virginia = us-east-1, Tokyo = ap-northeast-1, Singapore = ap-southeast-1"
+exit 1
+fi
+
+
+region=$1
+date=$(date "+_%m/%d/%Y")
+current=$(date "+%a %d %b %Y %r")
+
+aws ec2 describe-instances --region $region --query 'Reservations[?Instances[?State.Name==`running`]].Instances[].InstanceId' | sed 's/[]",[]//g' | sed '/^\s*$/d' > /tmp/instance.txt
+aws ec2 describe-instances --region $region --query 'Reservations[?Instances[?Tags[?Key==`elasticbeanstalk:environment-name`]]].Instances[].InstanceId' | sed 's/[]",[]//g' | sed '/^\s*$/d' > /tmp/instance2.txt
+sort /tmp/instance.txt /tmp/instance2.txt | uniq -u > /tmp/final.txt
+sed -i '/i-016257f6cf1933c39/d' /tmp/final.txt
+
+echo "----------------------------------------" && echo "----------------------------------------" >> /home/ec2-user/amiCreate.log
+echo $current >> /home/ec2-user/amiCreate.log
+echo "For $region" >> /home/ec2-user/amiCreate.log
+echo "Options: Ireland = eu-west-1, Virginia = us-east-1, Tokyo = ap-northeast-1, Singapore = ap-southeast-1" >> /home/ec2-user/amiCreate.log
+echo " " >> /home/ec2-user/amiCreate.log
+
+for ami in $(cat /tmp/final.txt)
+do
+echo "Creating ami:" && echo "Creating ami:" >> /home/ec2-user/amiCreate.log
+names=$(aws ec2 describe-instances --region $region --query "Reservations[?Instances[?InstanceId=='$ami']].Instances[].Tags[].Value | [0]" | sed 's/[],"[]//g')
+aminame=$(aws ec2 create-image --region $region --instance-id $ami --name $names$date --no-reboot | grep "ImageId" | sed 's/{}"//g')
+echo $aminame && echo $aminame >> /home/ec2-user/amiCreate.log
+echo "from instance:" && echo "from instance:" >> /home/ec2-user/amiCreate.log
+echo $ami $names && echo $ami $names >> /home/ec2-user/amiCreate.log
+echo "----------------------------------------" && echo "----------------------------------------" >> /home/ec2-user/amiCreate.log && echo " " >> /home/ec2-user/amiCreate.log
+done
+
+rm /tmp/instance.txt /tmp/instance2.txt
+rm /tmp/final.txt

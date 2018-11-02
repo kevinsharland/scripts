@@ -1,0 +1,16 @@
+#!/bin/bash
+
+free=$(free -m | grep Mem | awk '{print $3}')
+totall=$(free -m | grep Mem | awk '{print $2}')
+amount=$(( $free/100 ))
+total=$(( $totall/2 ))
+
+echo $free
+echo $total
+echo $amount
+if [ "$free" -gt "$total" ]
+then
+echo "1"
+else
+echo "0"
+fi

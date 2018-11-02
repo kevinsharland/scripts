@@ -1,0 +1,47 @@
+#!/bin/bash
+
+#thefile=$(ssh ubuntu@13.127.150.191 'cd /var/log/ && ls -tr | tail -n 1')
+#scp ubuntu@13.127.150.191:/var/log/$thefile /home/ec2-user/sending
+#scp ubuntu@13.127.150.191:/home/ubuntu/client1.ovpn /home/ec2-user/sending
+
+#subject=$1
+#mailing=$2
+
+#echo 'testing' | mail -s $subject -a /home/ec2-user/sending/client1.ovpn -a /home/ec2-user/sending/$thefile $mailing
+###################################################################################
+
+
+#thefile=$(ssh ubuntu@13.127.150.191 'cd /var/log/ && ls -tr | tail -n 1')
+#scp ubuntu@13.127.150.191:/var/log/$thefile /home/ec2-user/sending
+
+#sudo find / -type d -name "postgresql"
+###################################################################################
+
+#filename=$1
+#directoryname=$2
+#thefile=$(sudo find / -type f -name "$filename")
+#location=$(ssh ubuntu@13.127.150.191 sudo find / -type d -name "$directoryname")
+ 
+#echo $filename
+#echo $thefile
+#echo $location
+
+#scp $thefile ubuntu@13.127.150.191:$location
+####################################################################################
+
+if [ $# -lt 3 ]
+then
+        echo "usage: $0 <db server> <database> <destination email>"
+        exit 1
+fi
+
+filename=$1
+directoryname=$2
+thefile=$(sudo find / -type f -name "$filename")
+location=$(ssh ubuntu@13.127.150.191 sudo find / -type d -name "$directoryname")
+
+echo $filename
+echo $thefile
+echo $location
+
+scp $thefile ubuntu@13.127.150.191:$location
