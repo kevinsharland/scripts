@@ -1,13 +1,66 @@
 #!/bin/bash
 
 #runs though the security groups to see if the ip address is there
-
-ipaddress=$1
-region=$2
+#ipaddress=$1
+region="eu-west-1"
 
 for i in "$@"
-do
-echo $i
-ip=$(aws ec2 describe-security-groups --region $region --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$i']]].GroupName")
-echo $ip
+	do
+		for a in "$i"
+			do
+				echo $a ireland
+				ip=$(aws ec2 describe-security-groups --region eu-west-1 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$a']]].GroupName")
+				echo $ip
+		done
+		for b in "$i"
+			do
+				echo $b virginia
+                                ip=$(aws ec2 describe-security-groups --region us-east-1 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$b']]].GroupName")
+                                echo $ip
+
+		done
+                for c in "$i"
+                        do
+                                echo $c tokyo
+                                ip=$(aws ec2 describe-security-groups --region ap-northeast-1 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$c']]].GroupName")
+                                echo $ip
+
+                done
+
+                for d in "$i"
+                        do
+                                echo $i singapore
+                                ip=$(aws ec2 describe-security-groups --region ap-southeast-1 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$d']]].GroupName")
+                                echo $ip
+
+                done
+                for e in "$i"
+                        do
+                                echo $i london
+                                ip=$(aws ec2 describe-security-groups --region eu-west-2 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$e']]].GroupName")
+                                echo $ip
+
+                done
+                for f in "$i"
+                        do
+                                echo $i ohio
+                                ip=$(aws ec2 describe-security-groups --region us-east-2 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$f']]].GroupName")
+                                echo $ip
+
+                done
+                for g in "$i"
+                        do
+                                echo $i seoul
+                                ip=$(aws ec2 describe-security-groups --region ap-northeast-2 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$g']]].GroupName")
+                                echo $ip
+
+                done
+		for h in "$i"                        
+			do
+                                echo $i sydney
+                                ip=$(aws ec2 describe-security-groups --region ap-southeast-2 --query "SecurityGroups[?IpPermissions[?IpRanges[?CidrIp=='$h']]].GroupName")
+                                echo $ip
+
+                done
+
 done
