@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#cleans up the amis for specified time frame that you provide and the snapshots associated with that ami image
+#provide the region, starting date and the ending date
+
 region=$1
 fromdate=$2
 todate=$3

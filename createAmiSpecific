@@ -1,4 +1,6 @@
 #!/bin/bash
+#creates ami images of specific instances in a region and copies those images to a nother region
+
 
 if [ $# -lt 3 ]
 then

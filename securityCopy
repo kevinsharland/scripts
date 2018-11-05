@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#creates or copies the security group of one vpc in a region to a different vpc in a different region
+
 #checks to see if the enteredthe correct information
 if [ $# -lt 4 ]
 then

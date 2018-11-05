@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#gives you the instances in a specified time frame
+
 region=$1
 fromdate=$2
 todate=$3

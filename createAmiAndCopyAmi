@@ -1,7 +1,9 @@
 #!/bin/bash
 
-region="ap-south-1"
-destinationregion="sa-east-1"
+#creates an ami image of the running instance aside from the elastic beanstalk instance from one region and copies them to a specified region
+
+region=$1
+destinationregion=$2
 date=$(date "+_%m/%d/%Y/%M")
 current=$(date "+%a %d %b %Y %r")
 
