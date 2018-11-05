@@ -1,0 +1,51 @@
+#!/bin/bash
+
+region="ap-south-1"
+destinationregion="sa-east-1"
+date=$(date "+_%m/%d/%Y/%M")
+current=$(date "+%a %d %b %Y %r")
+
+#get the instance ids
+aws ec2 describe-instances --region $region --query 'Reservations[?Instances[?State.Name==`running`]].Instances[].InstanceId' | sed 's/[]",[]//g' | sed '/^\s*$/d' > /tmp/instance.txt
+aws ec2 describe-instances --region $region --query 'Reservations[?Instances[?Tags[?Key==`elasticbeanstalk:environment-name`]]].Instances[].InstanceId' | sed 's/[]",[]//g' | sed '/^\s*$/d' > /tmp/instance2.txt
+sort /tmp/instance.txt /tmp/instance2.txt | uniq -u > /tmp/final.txt
+sed -i '/i-016257f6cf1933c39/d' /tmp/final.txt
+
+#creates the ami image
+for instance in $(cat /tmp/final.txt)
+do
+names=$(aws ec2 describe-instances --region $region --query "Reservations[?Instances[?InstanceId=='$instance']].Instances[].Tags[].Value | [0]" | sed 's/[],"[]//g')
+echo $instance
+echo $names
+aminame=$(aws ec2 create-image --region $region --instance-id $instance --name $names$date --no-reboot | grep "ImageId" | awk '{print $2}'| sed 's/[]",}[{[]//g' >> /tmp/$region\friday.txt)
+done
+
+#checks to see if the ami has been created
+echo "checking ami status"
+sleep 10
+
+state=1
+while [ "$state" -gt 0 ]
+        do
+                echo $state pending
+                state=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[].State" | grep -e "pending" | wc -l)
+                sleep 8
+done
+
+sleep 10
+echo "done"
+
+#copies the ami to another region
+for amiid in $(cat /tmp/$region\friday.txt)
+        do
+                aminame=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?ImageId=='$amiid'].Name" | sed 's/[]",}[{[]//g' | sed '/^\s*$/d')
+                for name in "$amiid"
+                        do
+                        aws ec2 copy-image --source-image-id $name --source-region $region --region $destinationregion --name "$aminame"
+                        echo $name $aminame
+                done
+done
+
+rm /tmp/instance.txt /tmp/instance2.txt
+rm /tmp/final.txt
+rm /tmp/ap-south-1friday.txt

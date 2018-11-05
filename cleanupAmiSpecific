@@ -1,0 +1,31 @@
+#!/bin/bash
+
+region=$1
+fromdate=$2
+todate=$3
+current=$(date "+%a %d %b %Y %r")
+startdate=$(date +%Y-%m-%d --date "$fromdate days ago")
+enddate=$(date +%Y-%m-%d --date "$todate days ago")
+aminame=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].ImageId" | awk '{print $1}' | sed 's/[]",}[{[]//g')
+
+#Find the snapshot id from the AMI ID, and deregisters the AMI
+for output in $aminame
+do
+name=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?ImageId == '$output'].Name" | sed 's/[]",}[{[]//g')
+aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?ImageId=='$output'].[BlockDeviceMappings[*].Ebs.SnapshotId]" | grep snap | awk '{print $1}' | sed 's/[",]//g' >> /tmp/tmp.txt \
+&& echo "Deregistering: $name $output" \
+&& aws ec2 deregister-image --region $region --image-id $output
+done
+
+echo " "
+
+#Finds the Snapshot from the previous loop, and deletes the Snapshot
+for input in $(cat /tmp/tmp.txt)
+do
+snap=$(aws ec2 describe-snapshots --region $region --owner 376797288585 --query "Snapshots[?SnapshotId=='$input'].Description" | awk '{print $5}' | sed 's/[]",}[{[]//g') \
+&& sleep 1 \
+&& echo "Deleting: $input $snap" \
+&& aws ec2 delete-snapshot --region $region --snapshot-id $input
+done
+
+rm /tmp/tmp.txt
