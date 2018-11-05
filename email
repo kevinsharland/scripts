@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#differnt way one can send an email from an instance
+
 #thefile=$(ssh ubuntu@13.127.150.191 'cd /var/log/ && ls -tr | tail -n 1')
 #scp ubuntu@13.127.150.191:/var/log/$thefile /home/ec2-user/sending
 #scp ubuntu@13.127.150.191:/home/ubuntu/client1.ovpn /home/ec2-user/sending

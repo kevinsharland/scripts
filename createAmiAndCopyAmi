@@ -51,3 +51,4 @@ done
 rm /tmp/instance.txt /tmp/instance2.txt
 rm /tmp/final.txt
 rm /tmp/ap-south-1friday.txt
+rm /tmp/$region\friday.txt
