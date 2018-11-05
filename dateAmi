@@ -5,6 +5,12 @@ fromdate=$2
 todate=$3
 startdate=$(date +%Y-%m-%d --date "$fromdate days ago")
 enddate=$(date +%Y-%m-%d --date "$todate days ago")
-aminame=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].{Name:Name,ID:ImageId}" | awk '{print $1}' | sed 's/[]",}[{[]//g')
+
+echo $startdate
+echo $enddate
+
+echo $region
+#aminame=$(aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].{Name:Name,ID:ImageId}" | awk '{print $1}' | sed 's/[]",}[{[]//g')
+aws ec2 describe-images --region $region --owner 376797288585 --query "Images[?CreationDate>='$startdate' && CreationDate<'$enddate'].{Name:Name,ID:ImageId}"
 
 echo $aminame
